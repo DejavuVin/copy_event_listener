@@ -9,8 +9,18 @@ edition = "2021"
 clipboard-master = { git = "https://github.com/DoumanAsh/clipboard-master.git", branch = "master" }
 notify-rust = "4.9"
 objc2 = { version = "0.5.1", features = ["relax-void-encoding"] }
-objc2-app-kit = { version = "0.2.0", features = ["NSPasteboard", "NSPasteboardItem"] }
-objc2-foundation = { version = "0.2.0", features = ["NSArray", "NSString", "NSEnumerator", "NSGeometry"] }
+objc2-app-kit = { version = "0.2.0", features = [
+    "NSPasteboard",
+    "NSPasteboardItem",
+] }
+objc2-foundation = { version = "0.2.0", features = [
+    "NSArray",
+    "NSString",
+    "NSEnumerator",
+    "NSGeometry",
+] }
+rusqlite = { version = "0.30.0", features = ["bundled"] }
+dirs = "5.0"
 
 unicode-segmentation = "1.10.1"
 [features]

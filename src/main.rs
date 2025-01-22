@@ -1,6 +1,6 @@
 mod clipboard_content;
 
-use std::io::{self};
+use std::io;
 
 use clipboard_content::ClipboardContent;
 use clipboard_master::{CallbackResult, ClipboardHandler, Master};
@@ -16,13 +16,15 @@ impl<'a> ClipboardHandler for Handler {
     fn on_clipboard_change(&mut self) -> CallbackResult {
         let contents = get_clipboard_contents(&self.pasteboard);
         match contents {
-            Ok(contents) => {
+            Ok(mut contents) => {
                 println!("🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣");
-                println!("contents length: {}", contents.len());
-                for c in contents {
-                    // println!("count: {:?}, {}", c.len(), c.display());
-                    c.display_all();
-                    println!("count: {}", c.len());
+                for c in &mut contents {
+                    if let Ok(len) = c.len() {
+                        println!("contents length: {}", len);
+                        if let Ok(_) = c.display_all() {
+                            println!("count: {}", len);
+                        }
+                    }
                 }
                 CallbackResult::Next
             }
@@ -47,8 +49,11 @@ fn get_clipboard_contents(pasteboard: &Id<NSPasteboard>) -> Result<Vec<Clipboard
         return Ok(contents);
     }
 
+    let mut content = ClipboardContent::new().map_err(|e| e.to_string())?;
+    content.start_event().map_err(|e| e.to_string())?;
+
     for item in items {
-        let mut content = ClipboardContent::new();
+        let item_id = content.start_item().map_err(|e| e.to_string())?;
         let types = unsafe { item.types() };
         for pb_type in types {
             let uti = pb_type.to_string();
@@ -59,12 +64,14 @@ fn get_clipboard_contents(pasteboard: &Id<NSPasteboard>) -> Result<Vec<Clipboard
                 }
                 Some(data) => {
                     let bytes = data.bytes().to_vec();
-                    content.on_data(uti, bytes);
+                    content
+                        .add_type(item_id, uti, bytes)
+                        .map_err(|e| e.to_string())?;
                 }
             }
         }
-        contents.push(content);
     }
+    contents.push(content);
 
     Ok(contents)
 }
