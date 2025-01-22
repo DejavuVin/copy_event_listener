@@ -1,0 +1,17 @@
+[package]
+name = "cb_stack_rs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clipboard-master = { git = "https://github.com/DoumanAsh/clipboard-master.git", branch = "master" }
+notify-rust = "4.9"
+objc2 = { version = "0.5.1", features = ["relax-void-encoding"] }
+objc2-app-kit = { version = "0.2.0", features = ["NSPasteboard", "NSPasteboardItem"] }
+objc2-foundation = { version = "0.2.0", features = ["NSArray", "NSString", "NSEnumerator", "NSGeometry"] }
+
+unicode-segmentation = "1.10.1"
+[features]
+cargo-clippy = []
