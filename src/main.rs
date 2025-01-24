@@ -1,33 +1,25 @@
 mod clipboard_content;
+mod database;
 
 use std::io;
 
-use clipboard_content::ClipboardContent;
+use clipboard_content::ClipboardStorage;
 use clipboard_master::{CallbackResult, ClipboardHandler, Master};
 use notify_rust::Notification;
 use objc2::rc::Id;
 use objc2_app_kit::NSPasteboard;
+use rusqlite::Connection;
 
 struct Handler {
     pasteboard: Id<NSPasteboard>,
+    conn: Connection,
 }
 
 impl<'a> ClipboardHandler for Handler {
     fn on_clipboard_change(&mut self) -> CallbackResult {
-        let contents = get_clipboard_contents(&self.pasteboard);
+        let contents = get_clipboard_event(&self.pasteboard, &self.conn);
         match contents {
-            Ok(mut contents) => {
-                println!("🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣🤣");
-                for c in &mut contents {
-                    if let Ok(len) = c.len() {
-                        println!("contents length: {}", len);
-                        if let Ok(_) = c.display_all() {
-                            println!("count: {}", len);
-                        }
-                    }
-                }
-                CallbackResult::Next
-            }
+            Ok(_contents) => CallbackResult::Next,
             Err(e) => CallbackResult::StopWithError(io::Error::new(io::ErrorKind::Other, e)),
         }
     }
@@ -37,59 +29,61 @@ impl<'a> ClipboardHandler for Handler {
     }
 }
 
-fn get_clipboard_contents(pasteboard: &Id<NSPasteboard>) -> Result<Vec<ClipboardContent>, String> {
-    let items = unsafe { pasteboard.pasteboardItems() };
-    if let None = items {
-        return Err(String::from("Failed to get pasteboard items"));
-    }
-    let items = items.unwrap();
+fn get_clipboard_event(pasteboard: &Id<NSPasteboard>, conn: &Connection) -> Result<(), String> {
+    let items = match unsafe { pasteboard.pasteboardItems() } {
+        None => return Err(String::from("Failed to get pasteboard items")),
+        Some(items) => items,
+    };
 
-    let mut contents = Vec::new();
-    if items.is_empty() {
-        return Ok(contents);
-    }
-
-    let mut content = ClipboardContent::new().map_err(|e| e.to_string())?;
-    content.start_event().map_err(|e| e.to_string())?;
+    let mut content = ClipboardStorage::new(conn);
+    content.start_event();
 
     for item in items {
-        let item_id = content.start_item().map_err(|e| e.to_string())?;
+        content.start_item();
         let types = unsafe { item.types() };
         for pb_type in types {
-            let uti = pb_type.to_string();
             match unsafe { item.dataForType(&pb_type) } {
-                None => {
-                    println!("type: {:?}, data is None", uti);
-                    continue;
-                }
+                None => continue,
                 Some(data) => {
                     let bytes = data.bytes().to_vec();
-                    content
-                        .add_type(item_id, uti, bytes)
-                        .map_err(|e| e.to_string())?;
+                    content.add_type(pb_type.to_string(), bytes)?;
                 }
             }
         }
     }
-    contents.push(content);
 
-    Ok(contents)
+    content.finalize_event().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn notify_error(title: &str, e: &str) {
+    Notification::new().summary(title).body(&e).show().unwrap();
 }
 
 fn main() {
+    if let Err(e) = database::init_database() {
+        notify_error("paste_stack: database init error", &e.to_string());
+        return;
+    }
+
+    let conn = match database::get_connection() {
+        Err(e) => {
+            notify_error("paste_stack: failed get db conn", &e.to_string());
+            return;
+        }
+        Ok(conn) => conn,
+    };
+
     let handler = Handler {
         pasteboard: unsafe { NSPasteboard::generalPasteboard() },
+        conn,
     };
 
     let mut master = Master::new(handler).unwrap();
     match master.run() {
-        Ok(_) => (),
         Err(e) => {
-            Notification::new()
-                .summary("Clipboard Monitor Error during running")
-                .body(&e.to_string())
-                .show()
-                .unwrap();
+            notify_error("paste_stack: clipboard monitor error", &e.to_string());
         }
-    };
+        _ => (),
+    }
 }
