@@ -57,7 +57,8 @@ fn get_clipboard_event(pasteboard: &Id<NSPasteboard>, conn: &Connection) -> Resu
 }
 
 fn notify_error(title: &str, e: &str) {
-    Notification::new().summary(title).body(&e).show().unwrap();
+    println!("paste_stack: {} {}", title, e);
+    // Notification::new().summary(title).body(&e).show().unwrap();
 }
 
 fn main() {
