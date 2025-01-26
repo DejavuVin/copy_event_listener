@@ -31,24 +31,32 @@ impl<'a> ClipboardStorage<'a> {
         self.current_item = None;
     }
 
+    fn store_item(&mut self) {
+        if let Some(event) = self.current_event.as_mut() {
+            if let Some(item) = self.current_item.take() {
+                event.add_item(item);
+            }
+        }
+    }
+
     pub fn start_item(&mut self) {
         if self.current_event.is_none() {
             self.start_event();
+        } else {
+            self.store_item();
         }
         self.current_item = Some(ClipboardItem::new());
     }
 
-    pub fn add_type(&mut self, uti: String, data: Vec<u8>) -> Result<(), String> {
-        match self.current_item.is_none() {
-            true => Err("No active item".to_string()),
-            false => {
-                self.current_item
-                    .as_mut()
-                    .unwrap()
-                    .add_type(ClipboardType::new(uti, data));
-                Ok(())
-            }
+    pub fn add_type(&mut self, uti: String, data: Vec<u8>) {
+        if self.current_item.is_none() {
+            self.start_item();
         }
+
+        self.current_item
+            .as_mut()
+            .unwrap()
+            .add_type(ClipboardType::new(uti, data));
     }
 
     fn is_duplicate_event(&self, event_hash: &str) -> SqlResult<bool> {
@@ -98,19 +106,20 @@ impl<'a> ClipboardStorage<'a> {
     }
 
     pub fn finalize_event(&mut self) -> SqlResult<()> {
-        if let Some(mut event) = self.current_event.take() {
-            if let Some(item) = self.current_item.take() {
-                event.add_item(item);
-            }
+        self.store_item();
 
-            let event_hash = event.calculate_hash();
-            if self.is_duplicate_event(&event_hash)? {
-                return Ok(());
-            }
+        let mut event = match self.current_event.take() {
+            None => return Ok(()),
+            Some(event) => event,
+        };
 
-            self.store_event(&mut event)?;
-            self.cleanup_old_events()?;
+        let event_hash = event.calculate_hash();
+        if self.is_duplicate_event(&event_hash)? {
+            return Ok(());
         }
+
+        self.store_event(&mut event)?;
+        self.cleanup_old_events()?;
 
         Ok(())
     }

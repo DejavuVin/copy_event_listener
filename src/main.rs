@@ -31,9 +31,49 @@ impl<'a> ClipboardHandler for Handler {
 fn get_clipboard_event(pasteboard: &Id<NSPasteboard>, conn: &Connection) -> Result<(), String> {
     autoreleasepool(|_| {
         let items = match unsafe { pasteboard.pasteboardItems() } {
-            None => return Err(String::from("Failed to get pasteboard items")),
+            None => {
+                return Ok(());
+            }
             Some(items) => items,
         };
+
+        // !NOTE:
+        // This method will gets more "apple-style" data from copy clipboard,
+        // for example: `NSStringPboardType`, `Apple HTML pasteboard type`, `CorePasteboardFlavorType`, `NSFilenamesPboardType`, `com.apple.icns`... .
+        // But, This method cannot get all the contents of the clipboard. (especially: multiple files or folders, this method can only get the public.file-url of the first file.)
+        // And `pasteboard.pasteboardItems()` (Current methods used) is enough to stores user copied data.
+        // ```
+        // match unsafe { pasteboard.types() } {
+        //     None => (),
+        //     Some(types) => {
+        //         for ele in types {
+        //             let data = unsafe { pasteboard.dataForType(&ele) };
+        //             match data {
+        //                 None => (),
+        //                 Some(data) => {
+        //                     let bytes = data.bytes().to_vec();
+        //                     println!("data.len for type {:?} : {:?}", ele, bytes.len());
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+        // ```
+        match unsafe { pasteboard.types() } {
+            None => (),
+            Some(types) => {
+                for ele in types {
+                    let data = unsafe { pasteboard.dataForType(&ele) };
+                    match data {
+                        None => (),
+                        Some(data) => {
+                            let bytes = data.bytes().to_vec();
+                            println!("data.len for type {:?} : {:?}", ele, bytes.len());
+                        }
+                    }
+                }
+            }
+        }
 
         let mut content = ClipboardStorage::new(conn);
         content.start_event();
@@ -46,7 +86,7 @@ fn get_clipboard_event(pasteboard: &Id<NSPasteboard>, conn: &Connection) -> Resu
                     None => continue,
                     Some(data) => {
                         let bytes = data.bytes().to_vec();
-                        content.add_type(pb_type.to_string(), bytes)?;
+                        content.add_type(pb_type.to_string(), bytes);
                     }
                 }
             }
