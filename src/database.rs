@@ -9,7 +9,7 @@ pub fn get_db_path() -> PathBuf {
     dir
 }
 
-pub fn init_database() -> SqlResult<()> {
+pub fn init_database() -> SqlResult<Connection> {
     let db_path = get_db_path();
     // Ensure parent directory exists
     if let Some(parent) = db_path.parent() {
@@ -51,9 +51,5 @@ pub fn init_database() -> SqlResult<()> {
         PRAGMA journal_mode = WAL;",
     )?;
 
-    Ok(())
-}
-
-pub fn get_connection() -> SqlResult<Connection> {
     Connection::open(get_db_path())
 }

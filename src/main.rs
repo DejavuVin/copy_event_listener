@@ -5,8 +5,7 @@ use std::io;
 
 use clipboard_content::ClipboardStorage;
 use clipboard_master::{CallbackResult, ClipboardHandler, Master};
-use notify_rust::Notification;
-use objc2::rc::Id;
+use objc2::rc::{autoreleasepool, Id};
 use objc2_app_kit::NSPasteboard;
 use rusqlite::Connection;
 
@@ -30,30 +29,32 @@ impl<'a> ClipboardHandler for Handler {
 }
 
 fn get_clipboard_event(pasteboard: &Id<NSPasteboard>, conn: &Connection) -> Result<(), String> {
-    let items = match unsafe { pasteboard.pasteboardItems() } {
-        None => return Err(String::from("Failed to get pasteboard items")),
-        Some(items) => items,
-    };
+    autoreleasepool(|_| {
+        let items = match unsafe { pasteboard.pasteboardItems() } {
+            None => return Err(String::from("Failed to get pasteboard items")),
+            Some(items) => items,
+        };
 
-    let mut content = ClipboardStorage::new(conn);
-    content.start_event();
+        let mut content = ClipboardStorage::new(conn);
+        content.start_event();
 
-    for item in items {
-        content.start_item();
-        let types = unsafe { item.types() };
-        for pb_type in types {
-            match unsafe { item.dataForType(&pb_type) } {
-                None => continue,
-                Some(data) => {
-                    let bytes = data.bytes().to_vec();
-                    content.add_type(pb_type.to_string(), bytes)?;
+        for item in items {
+            content.start_item();
+            let types = unsafe { item.types() };
+            for pb_type in types {
+                match unsafe { item.dataForType(&pb_type) } {
+                    None => continue,
+                    Some(data) => {
+                        let bytes = data.bytes().to_vec();
+                        content.add_type(pb_type.to_string(), bytes)?;
+                    }
                 }
             }
         }
-    }
 
-    content.finalize_event().map_err(|e| e.to_string())?;
-    Ok(())
+        content.finalize_event().map_err(|e| e.to_string())?;
+        Ok(())
+    })
 }
 
 fn notify_error(title: &str, e: &str) {
@@ -62,14 +63,9 @@ fn notify_error(title: &str, e: &str) {
 }
 
 fn main() {
-    if let Err(e) = database::init_database() {
-        notify_error("paste_stack: database init error", &e.to_string());
-        return;
-    }
-
-    let conn = match database::get_connection() {
+    let conn = match database::init_database() {
         Err(e) => {
-            notify_error("paste_stack: failed get db conn", &e.to_string());
+            notify_error("paste_stack: database init error", &e.to_string());
             return;
         }
         Ok(conn) => conn,
