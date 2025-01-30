@@ -133,4 +133,57 @@ impl<'a> ClipboardStorage<'a> {
         )?;
         Ok(())
     }
+
+    pub fn restore_event_by_id(&self, id: i64) -> SqlResult<ClipboardEvent> {
+        // First get the event
+        let mut event = self.conn.query_row(
+            "SELECT id, timestamp, event_hash FROM clipboard_events WHERE id = ?1",
+            [id],
+            |row| {
+                Ok(ClipboardEvent {
+                    id: Some(row.get(0)?),
+                    timestamp: row.get(1)?,
+                    items: Vec::new(),
+                })
+            },
+        )?;
+
+        // Get all items for this event
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id FROM clipboard_items WHERE event_id = ?1")?;
+        let item_ids: Vec<i64> = stmt
+            .query_map([id], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // For each item, get its types
+        for item_id in item_ids {
+            let mut item = ClipboardItem {
+                id: Some(item_id),
+                event_id: Some(id),
+                types: Vec::new(),
+            };
+
+            let mut type_stmt = self
+                .conn
+                .prepare("SELECT id, uti, data, size FROM clipboard_types WHERE item_id = ?1")?;
+            let types = type_stmt.query_map([item_id], |row| {
+                Ok(ClipboardType {
+                    id: Some(row.get(0)?),
+                    item_id: Some(item_id),
+                    uti: row.get(1)?,
+                    data: row.get(2)?,
+                    size: row.get::<_, i64>(3)? as usize,
+                })
+            })?;
+
+            for type_result in types {
+                item.types.push(type_result?);
+            }
+
+            event.items.push(item);
+        }
+
+        Ok(event)
+    }
 }
