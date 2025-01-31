@@ -1,5 +1,5 @@
 [package]
-name = "paste_stack"
+name = "copy_event_listener"
 version = "0.1.0"
 edition = "2021"
 

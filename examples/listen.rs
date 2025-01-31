@@ -1,5 +1,5 @@
-use paste_stack::clipboard::ClipboardListener;
-use paste_stack::event::Event;
+use copy_event_listener::clipboard::ClipboardListener;
+use copy_event_listener::event::Event;
 
 fn on_clipboard_event(event: Event) {
     println!("{:?}", event);
