@@ -6,16 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-objc2 = { version = "0.5.1", features = ["relax-void-encoding"] }
-objc2-app-kit = { version = "0.2.0", features = [
+objc2 = { version = "^0.5", features = ["relax-void-encoding"] }
+objc2-app-kit = { version = "^0.2", features = [
     "NSPasteboard",
     "NSPasteboardItem",
 ] }
-objc2-foundation = { version = "0.2.0", features = [
+objc2-foundation = { version = "^0.2", features = [
     "NSArray",
     "NSString",
     "NSEnumerator",
     "NSGeometry",
 ] }
-[features]
-cargo-clippy = []
